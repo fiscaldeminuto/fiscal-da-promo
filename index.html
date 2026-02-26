@@ -392,7 +392,7 @@
 
 <main>
   <div class="notice">
-    ℹ️ &nbsp;Os resultados são buscados em tempo real na API do Mercado Livre. Produtos sem preço original cadastrado não aparecem (impossível calcular o desconto). Links diretos para o ML — afiliado em breve.
+    ℹ️ &nbsp;Resultados buscados em tempo real na API do Mercado Livre. Apenas produtos com preço original cadastrado aparecem (necessário para calcular o desconto real). Todos os links já incluem seu ID de afiliado <strong>matt_tool=15318221</strong> automaticamente. 🔗
   </div>
 
   <div class="status-bar" id="status-bar">
@@ -414,6 +414,20 @@
   ];
 
   const DESCONTO_MIN = 12;
+  const MATT_TOOL = '15318221';
+  const MATT_WORD = 'flpcamargo';
+
+  function gerarLinkAfiliado(linkOriginal) {
+    try {
+      const url = new URL(linkOriginal);
+      url.searchParams.set('matt_tool', MATT_TOOL);
+      url.searchParams.set('matt_word', MATT_WORD);
+      url.searchParams.set('matt_source', 'fiscal_da_promo');
+      return url.toString();
+    } catch(e) {
+      return linkOriginal;
+    }
+  }
   let allResults = [];
   let filtroAtivo = 'all';
 
@@ -434,38 +448,43 @@
   }
 
   async function buscarCategoria(cat) {
-    // Usa discount=12-100 para pedir só produtos que o ML reconhece como em promoção
-    const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(cat.query)}&discount=${DESCONTO_MIN}-100&sort=discount_desc&limit=50`;
-    const res = await fetch(url);
-    const data = await res.json();
-
+    // Busca sem filtro de desconto (discount= exige auth 403)
+    // Filtra por original_price localmente — pega 3 páginas pra ter mais resultados
     const promos = [];
-    for (const item of (data.results || [])) {
-      const precoAtual = item.price;
-      const precoOriginal = item.original_price;
+    const offsets = [0, 50, 100];
 
-      // Se original_price disponível, calcula desconto real; caso contrário usa o mínimo (já passou no filtro ML)
-      let desconto = 0;
-      if (precoOriginal && precoOriginal > precoAtual) {
-        desconto = Math.round(((precoOriginal - precoAtual) / precoOriginal) * 100);
-      } else {
-        desconto = DESCONTO_MIN; // passou no filtro discount= do ML
-      }
+    for (const offset of offsets) {
+      try {
+        const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(cat.query)}&sort=relevance&limit=50&offset=${offset}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.results?.length) break;
 
-      if (desconto < DESCONTO_MIN) continue;
+        for (const item of data.results) {
+          const precoAtual = item.price;
+          const precoOriginal = item.original_price;
+          if (!precoOriginal || precoOriginal <= precoAtual) continue;
 
-      promos.push({
-        id: item.id,
-        titulo: item.title,
-        preco: precoAtual,
-        precoOriginal: precoOriginal || null,
-        desconto: desconto,
-        imagem: item.thumbnail?.replace('I.jpg', 'O.jpg'),
-        link: item.permalink,
-        categoria: cat.nome,
-        emoji: cat.emoji,
-        vendedor: item.seller?.nickname || '',
-      });
+          const desconto = Math.round(((precoOriginal - precoAtual) / precoOriginal) * 100);
+          if (desconto < DESCONTO_MIN) continue;
+
+          // Gera link de afiliado automaticamente
+          const linkAfiliado = gerarLinkAfiliado(item.permalink);
+
+          promos.push({
+            id: item.id,
+            titulo: item.title,
+            preco: precoAtual,
+            precoOriginal: precoOriginal,
+            desconto: desconto,
+            imagem: item.thumbnail?.replace('I.jpg', 'O.jpg'),
+            link: linkAfiliado,
+            linkOriginal: item.permalink,
+            categoria: cat.nome,
+            emoji: cat.emoji,
+          });
+        }
+      } catch(e) { break; }
     }
 
     return promos.sort((a, b) => b.desconto - a.desconto);
@@ -479,7 +498,7 @@
     const cardId = 'card-' + item.id;
     return `
       <div class="promo-card" id="${cardId}">
-        <div class="card-discount-badge ${item.precoOriginal ? '' : 'approx'}">-${item.desconto === 12 && !item.precoOriginal ? "≥12" : item.desconto}%</div>
+        <div class="card-discount-badge">-${item.desconto}%</div>
         ${item.imagem
           ? `<img class="card-img" src="${item.imagem}" alt="${item.titulo}" loading="lazy" onerror="this.style.display='none'">`
           : `<div class="card-img-placeholder">${item.emoji}</div>`}
@@ -487,7 +506,7 @@
           <div class="card-category">${item.emoji} ${item.categoria}</div>
           <div class="card-title">${item.titulo}</div>
           <div class="card-prices">
-            ${item.precoOriginal ? `<span class="price-old">${formatBRL(item.precoOriginal)}</span>` : ''}
+            <span class="price-old">${formatBRL(item.precoOriginal)}</span>
             <span class="price-new">${formatBRL(item.preco)}</span>
           </div>
         </div>
@@ -601,8 +620,8 @@
     if (!item) return;
 
     const texto = `🎮 *${item.titulo}*\n\n` +
-      `~~${formatBRL(item.precoOriginal)}~~ → *${formatBRL(item.preco)}* (-${item.desconto}% OFF)\n\n` +
-      `🔗 ${item.link}`;
+      `~~${formatBRL(item.precoOriginal)}~~ → *${formatBRL(item.preco)}* (-${item.desconto}% OFF) 🔥\n\n` +
+      `🛒 ${item.link}`;
 
     navigator.clipboard.writeText(texto).then(() => {
       const btn = document.querySelector(`#card-${id} .btn-copiar`);
