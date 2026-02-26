@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎮 Fiscal da Promo — Gamer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --yellow: #f5c400;
+      --green: #00ff88;
+      --red: #ff3b3b;
+      --gray: #141414;
+      --gray2: #1e1e1e;
+      --gray3: #2a2a2a;
+      --offwhite: #e8e4dc;
+      --text: #c8c8c8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--black);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--gray);
+      border-bottom: 2px solid var(--yellow);
+      padding: 24px 28px 20px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .header-left {}
+    .header-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .header-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(36px, 8vw, 56px);
+      letter-spacing: 2px;
+      color: var(--yellow);
+      line-height: 1;
+    }
+    .header-title span { color: #fff; }
+    .header-sub {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: #555;
+      margin-top: 6px;
+      letter-spacing: 1px;
+    }
+    .header-badge {
+      background: var(--green);
+      color: var(--black);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      display: inline-block;
+    }
+
+    /* CONTROLS */
+    .controls {
+      background: var(--gray2);
+      border-bottom: 1px solid var(--gray3);
+      padding: 16px 28px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #555;
+    }
+
+    .chip {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 5px 12px;
+      border-radius: 3px;
+      border: 1px solid var(--gray3);
+      background: var(--gray);
+      color: #888;
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: .5px;
+    }
+    .chip:hover { border-color: var(--yellow); color: var(--yellow); }
+    .chip.active { background: var(--yellow); color: var(--black); border-color: var(--yellow); font-weight: 600; }
+
+    .btn-buscar {
+      margin-left: auto;
+      background: var(--yellow);
+      color: var(--black);
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 18px;
+      letter-spacing: 2px;
+      padding: 8px 24px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-buscar:hover { background: #fff; }
+    .btn-buscar:disabled { background: var(--gray3); color: #555; cursor: not-allowed; }
+
+    /* MAIN */
+    main { padding: 24px 28px; max-width: 1100px; margin: 0 auto; }
+
+    /* STATUS */
+    .status-bar {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: #555;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-bar .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #555;
+    }
+    .status-bar.loading .dot { background: var(--yellow); animation: pulse 1s infinite; }
+    .status-bar.done .dot { background: var(--green); }
+    .status-bar.error .dot { background: var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* SECTION HEADER */
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--gray3);
+    }
+    .section-head-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 20px;
+      letter-spacing: 1.5px;
+      color: var(--yellow);
+    }
+    .section-count {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      color: #555;
+      letter-spacing: 1px;
+    }
+
+    /* GRID */
+    .promo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    /* CARD */
+    .promo-card {
+      background: var(--gray2);
+      border: 1px solid var(--gray3);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: border-color .2s, transform .2s;
+      position: relative;
+    }
+    .promo-card:hover {
+      border-color: var(--yellow);
+      transform: translateY(-2px);
+    }
+
+    .card-discount-badge {
+      position: absolute;
+      top: 10px; left: 10px;
+      background: var(--red);
+      color: #fff;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 16px;
+      letter-spacing: 1px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      z-index: 2;
+    }
+    .card-discount-badge.approx {
+      background: #e07800;
+    }
+
+    .card-img {
+      width: 100%;
+      aspect-ratio: 1/1;
+      object-fit: contain;
+      background: #111;
+      padding: 16px;
+    }
+    .card-img-placeholder {
+      width: 100%;
+      aspect-ratio: 1/1;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: var(--gray3);
+    }
+
+    .card-body {
+      padding: 12px 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card-category {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #555;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e0e0e0;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-prices {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .price-old {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: #555;
+      text-decoration: line-through;
+    }
+    .price-new {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      color: var(--green);
+      letter-spacing: 1px;
+    }
+
+    .card-footer {
+      padding: 10px 14px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-ver {
+      flex: 1;
+      background: var(--yellow);
+      color: var(--black);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      padding: 8px 12px;
+      text-align: center;
+      border-radius: 3px;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .btn-ver:hover { background: #fff; }
+
+    .btn-copiar {
+      background: var(--gray3);
+      color: #888;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 3px;
+      border: none;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-copiar:hover { background: var(--gray3); color: var(--yellow); }
+    .btn-copiar.copied { background: var(--green); color: var(--black); }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #444;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px; color: #555; margin-bottom: 6px; }
+    .empty-sub { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 1px; }
+
+    /* LOADER SKELETON */
+    .skeleton-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 32px; }
+    .skeleton-card { background: var(--gray2); border: 1px solid var(--gray3); border-radius: 6px; overflow: hidden; }
+    .skeleton-img { width: 100%; aspect-ratio: 1/1; background: var(--gray3); animation: shimmer 1.5s infinite; }
+    .skeleton-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .skeleton-line { height: 12px; background: var(--gray3); border-radius: 3px; animation: shimmer 1.5s infinite; }
+    .skeleton-line.short { width: 60%; }
+    .skeleton-line.medium { width: 80%; }
+    @keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:.8} }
+
+    /* NOTICE */
+    .notice {
+      background: var(--gray2);
+      border: 1px solid var(--gray3);
+      border-left: 3px solid var(--yellow);
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 24px;
+      letter-spacing: .3px;
+    }
+
+    @media (max-width: 600px) {
+      header, .controls, main { padding-left: 16px; padding-right: 16px; }
+      .btn-buscar { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="header-label">Fiscal de Minuto · Ferramenta Interna</div>
+    <div class="header-title">🎮 FISCAL<br><span>DA PROMO</span></div>
+    <div class="header-sub">Hardware Gamer · Desconto ≥ 12% · Mercado Livre</div>
+  </div>
+  <div style="text-align:right;">
+    <div class="header-badge">⚡ Ao vivo</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#555; margin-top:4px;" id="last-update">Nenhuma busca ainda</div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="filter-group">
+    <span class="filter-label">Categoria</span>
+    <button class="chip active" data-cat="all">Todas</button>
+    <button class="chip" data-cat="Teclado">⌨️ Teclado</button>
+    <button class="chip" data-cat="Mouse">🖱️ Mouse</button>
+    <button class="chip" data-cat="Mousepad">🟦 Mousepad</button>
+    <button class="chip" data-cat="Fone">🎧 Fone</button>
+    <button class="chip" data-cat="Monitor">🖥️ Monitor</button>
+    <button class="chip" data-cat="Suporte">📐 Suporte</button>
+  </div>
+  <button class="btn-buscar" id="btn-buscar" onclick="buscarPromos()">
+    🔍 BUSCAR PROMOS
+  </button>
+</div>
+
+<main>
+  <div class="notice">
+    ℹ️ &nbsp;Os resultados são buscados em tempo real na API do Mercado Livre. Produtos sem preço original cadastrado não aparecem (impossível calcular o desconto). Links diretos para o ML — afiliado em breve.
+  </div>
+
+  <div class="status-bar" id="status-bar">
+    <div class="dot"></div>
+    <span id="status-text">Clique em "Buscar Promos" para começar.</span>
+  </div>
+
+  <div id="results-container"></div>
+</main>
+
+<script>
+  const CATEGORIAS = [
+    { nome: 'Teclado',   query: 'teclado gamer',           emoji: '⌨️' },
+    { nome: 'Mouse',     query: 'mouse gamer',             emoji: '🖱️' },
+    { nome: 'Mousepad',  query: 'mousepad gamer',          emoji: '🟦' },
+    { nome: 'Fone',      query: 'headset gamer fone',      emoji: '🎧' },
+    { nome: 'Monitor',   query: 'monitor gamer',           emoji: '🖥️' },
+    { nome: 'Suporte',   query: 'suporte monitor gamer',   emoji: '📐' },
+  ];
+
+  const DESCONTO_MIN = 12;
+  let allResults = [];
+  let filtroAtivo = 'all';
+
+  // Chip filter
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      filtroAtivo = chip.dataset.cat;
+      renderResults();
+    });
+  });
+
+  function setStatus(type, text) {
+    const bar = document.getElementById('status-bar');
+    bar.className = 'status-bar ' + type;
+    document.getElementById('status-text').textContent = text;
+  }
+
+  async function buscarCategoria(cat) {
+    // Usa discount=12-100 para pedir só produtos que o ML reconhece como em promoção
+    const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(cat.query)}&discount=${DESCONTO_MIN}-100&sort=discount_desc&limit=50`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const promos = [];
+    for (const item of (data.results || [])) {
+      const precoAtual = item.price;
+      const precoOriginal = item.original_price;
+
+      // Se original_price disponível, calcula desconto real; caso contrário usa o mínimo (já passou no filtro ML)
+      let desconto = 0;
+      if (precoOriginal && precoOriginal > precoAtual) {
+        desconto = Math.round(((precoOriginal - precoAtual) / precoOriginal) * 100);
+      } else {
+        desconto = DESCONTO_MIN; // passou no filtro discount= do ML
+      }
+
+      if (desconto < DESCONTO_MIN) continue;
+
+      promos.push({
+        id: item.id,
+        titulo: item.title,
+        preco: precoAtual,
+        precoOriginal: precoOriginal || null,
+        desconto: desconto,
+        imagem: item.thumbnail?.replace('I.jpg', 'O.jpg'),
+        link: item.permalink,
+        categoria: cat.nome,
+        emoji: cat.emoji,
+        vendedor: item.seller?.nickname || '',
+      });
+    }
+
+    return promos.sort((a, b) => b.desconto - a.desconto);
+  }
+
+  function formatBRL(val) {
+    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  function renderCard(item) {
+    const cardId = 'card-' + item.id;
+    return `
+      <div class="promo-card" id="${cardId}">
+        <div class="card-discount-badge ${item.precoOriginal ? '' : 'approx'}">-${item.desconto === 12 && !item.precoOriginal ? "≥12" : item.desconto}%</div>
+        ${item.imagem
+          ? `<img class="card-img" src="${item.imagem}" alt="${item.titulo}" loading="lazy" onerror="this.style.display='none'">`
+          : `<div class="card-img-placeholder">${item.emoji}</div>`}
+        <div class="card-body">
+          <div class="card-category">${item.emoji} ${item.categoria}</div>
+          <div class="card-title">${item.titulo}</div>
+          <div class="card-prices">
+            ${item.precoOriginal ? `<span class="price-old">${formatBRL(item.precoOriginal)}</span>` : ''}
+            <span class="price-new">${formatBRL(item.preco)}</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a class="btn-ver" href="${item.link}" target="_blank">→ VER NO ML</a>
+          <button class="btn-copiar" onclick="copiarCard('${item.id}')">📋 COPIAR</button>
+        </div>
+      </div>`;
+  }
+
+  function renderSkeletons(n) {
+    let html = '<div class="skeleton-grid">';
+    for (let i = 0; i < n; i++) {
+      html += `<div class="skeleton-card">
+        <div class="skeleton-img"></div>
+        <div class="skeleton-body">
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line medium"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function renderResults() {
+    const container = document.getElementById('results-container');
+    if (allResults.length === 0) {
+      container.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">🎮</div>
+        <div class="empty-title">Nenhuma promo encontrada</div>
+        <div class="empty-sub">Tente buscar novamente</div>
+      </div>`;
+      return;
+    }
+
+    const filtered = filtroAtivo === 'all'
+      ? allResults
+      : allResults.filter(i => i.categoria === filtroAtivo);
+
+    // Group by category
+    const grupos = {};
+    for (const item of filtered) {
+      if (!grupos[item.categoria]) grupos[item.categoria] = [];
+      grupos[item.categoria].push(item);
+    }
+
+    let html = '';
+    for (const [cat, items] of Object.entries(grupos)) {
+      const catInfo = CATEGORIAS.find(c => c.nome === cat);
+      html += `
+        <div class="section-head">
+          <span class="section-head-title">${catInfo?.emoji || ''} ${cat}</span>
+          <span class="section-count">${items.length} promos com ≥${DESCONTO_MIN}% off</span>
+        </div>
+        <div class="promo-grid">
+          ${items.map(renderCard).join('')}
+        </div>`;
+    }
+
+    if (!html) {
+      html = `<div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">Sem promos nessa categoria</div>
+        <div class="empty-sub">Tente outra categoria ou busque novamente</div>
+      </div>`;
+    }
+
+    container.innerHTML = html;
+  }
+
+  async function buscarPromos() {
+    const btn = document.getElementById('btn-buscar');
+    btn.disabled = true;
+    btn.textContent = '⏳ BUSCANDO...';
+    allResults = [];
+
+    document.getElementById('results-container').innerHTML = renderSkeletons(12);
+    setStatus('loading', 'Buscando promos em todas as categorias...');
+
+    const erros = [];
+    for (const cat of CATEGORIAS) {
+      setStatus('loading', `Buscando ${cat.emoji} ${cat.nome}...`);
+      try {
+        const items = await buscarCategoria(cat);
+        allResults.push(...items);
+      } catch(e) {
+        erros.push(cat.nome);
+      }
+    }
+
+    const total = allResults.length;
+    const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('last-update').textContent = `Última busca: ${agora}`;
+
+    if (total === 0) {
+      setStatus('error', 'Nenhuma promo encontrada com ≥' + DESCONTO_MIN + '% de desconto.');
+    } else {
+      setStatus('done', `${total} promos encontradas com ≥${DESCONTO_MIN}% de desconto.${erros.length ? ' (' + erros.join(', ') + ' com erro)' : ''}`);
+    }
+
+    renderResults();
+    btn.disabled = false;
+    btn.innerHTML = '🔍 BUSCAR NOVAMENTE';
+  }
+
+  function copiarCard(id) {
+    const item = allResults.find(i => i.id === id);
+    if (!item) return;
+
+    const texto = `🎮 *${item.titulo}*\n\n` +
+      `~~${formatBRL(item.precoOriginal)}~~ → *${formatBRL(item.preco)}* (-${item.desconto}% OFF)\n\n` +
+      `🔗 ${item.link}`;
+
+    navigator.clipboard.writeText(texto).then(() => {
+      const btn = document.querySelector(`#card-${id} .btn-copiar`);
+      if (btn) {
+        btn.textContent = '✅ COPIADO';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = '📋 COPIAR';
+          btn.classList.remove('copied');
+        }, 2000);
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
