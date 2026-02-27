@@ -368,15 +368,9 @@
     <div class="header-title">🎮 FISCAL<br><span>DA PROMO</span></div>
     <div class="header-sub">Hardware Gamer · Desconto ≥ 12% · Mercado Livre</div>
   </div>
-  <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
-    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#888;" id="auth-status">🔒 Não conectado</div>
-    <button id="btn-login" onclick="logarComML()" style="background:var(--green);color:var(--black);font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;padding:8px 20px;border:none;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-      🔑 ENTRAR COM ML
-    </button>
-    <button id="btn-logout" onclick="logout()" style="background:var(--gray3);color:#888;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 14px;border:none;border-radius:3px;cursor:pointer;display:none;">
-      sair
-    </button>
-    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#555;" id="last-update">Nenhuma busca ainda</div>
+  <div style="text-align:right;">
+    <div class="header-badge">⚡ Ao vivo</div>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#555; margin-top:4px;" id="last-update">Nenhuma busca ainda</div>
   </div>
 </header>
 
@@ -391,7 +385,7 @@
     <button class="chip" data-cat="Monitor">🖥️ Monitor</button>
     <button class="chip" data-cat="Suporte">📐 Suporte</button>
   </div>
-  <button class="btn-buscar" id="btn-buscar" onclick="buscarPromos()" style="display:none;">
+  <button class="btn-buscar" id="btn-buscar" onclick="buscarPromos()">
     🔍 BUSCAR PROMOS
   </button>
 </div>
@@ -410,11 +404,16 @@
 </main>
 
 <script>
-  const CLIENT_ID    = '6398053890425858';
-  const REDIRECT_URI = 'https://flpcamargo.github.io/fiscal-da-promo';
-  const MATT_TOOL    = '15318221';
-  const MATT_WORD    = 'flpcamargo';
-  const DESCONTO_MIN = 12;
+  const CLIENT_ID     = '6398053890425858';
+  const CLIENT_SECRET = '1e57zwacvG1bXyJlB8dCSLbgxtdFJhux';
+  const REDIRECT_URI  = 'https://flpcamargo.github.io/fiscal-da-promo';
+  const MATT_TOOL     = '15318221';
+  const MATT_WORD     = 'flpcamargo';
+  const DESCONTO_MIN  = 12;
+
+  // Tokens — access_token dura 6h, refresh_token é permanente
+  let ACCESS_TOKEN   = 'APP_USR-6398053890425858-022714-ae064abcc1cd08a6fd90cacf5647b687-131925023';
+  let REFRESH_TOKEN  = 'TG-69a1e668c3650f0001e50bdc-131925023';
 
   const CATEGORIAS = [
     { nome: 'Teclado',   query: 'teclado gamer',         emoji: '⌨️' },
@@ -425,67 +424,52 @@
     { nome: 'Suporte',   query: 'suporte monitor gamer', emoji: '📐' },
   ];
 
-  let accessToken = null;
   let filtroAtivo = 'all';
   let allResults  = [];
 
-  // ── AUTH ──────────────────────────────────────────────────────────
+  // ── TOKEN ─────────────────────────────────────────────────────────
 
-  function getTokenFromURL() {
-    // Após o redirect do ML, o code vem na query string
-    const params = new URLSearchParams(window.location.search);
-    return params.get('code');
+  async function renovarToken() {
+    try {
+      const res = await fetch('https://api.mercadolibre.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type:    'refresh_token',
+          client_id:     CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          refresh_token: REFRESH_TOKEN,
+        })
+      });
+      if (!res.ok) throw new Error('Falha ao renovar token: ' + res.status);
+      const data = await res.json();
+      ACCESS_TOKEN  = data.access_token;
+      REFRESH_TOKEN = data.refresh_token;
+      console.log('✅ Token renovado com sucesso');
+      return true;
+    } catch(e) {
+      console.error('Erro ao renovar token:', e);
+      return false;
+    }
   }
 
-  async function trocarCodePorToken(code) {
-    // O ML exige que a troca de code por token seja feita server-side
-    // Como somos uma página estática, usamos o fluxo implícito via fragment (#access_token=...)
-    // Porém o ML não suporta implicit flow — usamos PKCE como alternativa
-    // Por ora: guardamos o code e orientamos o usuário
-    return null;
-  }
+  async function fetchComToken(url) {
+    // Primeira tentativa com token atual
+    let res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+    });
 
-  function getTokenFromFragment() {
-    const hash = window.location.hash;
-    if (!hash) return null;
-    const params = new URLSearchParams(hash.replace('#', ''));
-    return params.get('access_token');
-  }
+    // Se 401, tenta renovar o token e repetir
+    if (res.status === 401) {
+      setStatus('loading', 'Renovando token de acesso...');
+      const renovado = await renovarToken();
+      if (!renovado) throw new Error('Não foi possível renovar o token.');
+      res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+      });
+    }
 
-  function salvarToken(token) {
-    sessionStorage.setItem('ml_token', token);
-    accessToken = token;
-  }
-
-  function carregarToken() {
-    const t = sessionStorage.getItem('ml_token');
-    if (t) accessToken = t;
-    return t;
-  }
-
-  function logarComML() {
-    // Gera state aleatório pra segurança
-    const state = Math.random().toString(36).substring(2);
-    sessionStorage.setItem('ml_oauth_state', state);
-
-    const authURL = `https://auth.mercadolivre.com.br/authorization?response_type=token&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
-    window.location.href = authURL;
-  }
-
-  function logout() {
-    sessionStorage.removeItem('ml_token');
-    accessToken = null;
-    atualizarUIAuth();
-    document.getElementById('results-container').innerHTML = '';
-    setStatus('', 'Desconectado. Faça login para buscar promos.');
-  }
-
-  function atualizarUIAuth() {
-    const loggedIn = !!accessToken;
-    document.getElementById('btn-login').style.display  = loggedIn ? 'none'  : 'flex';
-    document.getElementById('btn-logout').style.display = loggedIn ? 'flex'  : 'none';
-    document.getElementById('btn-buscar').style.display = loggedIn ? 'flex'  : 'none';
-    document.getElementById('auth-status').textContent  = loggedIn ? '✅ Conectado ao ML' : '🔒 Não conectado';
+    return res;
   }
 
   // ── AFILIADO ──────────────────────────────────────────────────────
@@ -503,15 +487,13 @@
   // ── BUSCA ─────────────────────────────────────────────────────────
 
   async function buscarCategoria(cat) {
-    const promos = [];
+    const promos  = [];
     const offsets = [0, 50, 100];
 
     for (const offset of offsets) {
       try {
         const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(cat.query)}&discount=${DESCONTO_MIN}-100&sort=discount_desc&limit=50&offset=${offset}`;
-        const res = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        });
+        const res = await fetchComToken(url);
         if (!res.ok) break;
         const data = await res.json();
         if (!data.results?.length) break;
@@ -577,7 +559,7 @@
         </div>
         <div class="card-footer">
           <a class="btn-ver" href="${item.link}" target="_blank">→ VER NO ML</a>
-          <button class="btn-copiar" onclick="copiarCard('${item.id}')">📋</button>
+          <button class="btn-copiar" onclick="copiarCard('${item.id}')">📋 COPIAR</button>
         </div>
       </div>`;
   }
@@ -632,9 +614,10 @@
   async function buscarPromos() {
     const btn = document.getElementById('btn-buscar');
     btn.disabled = true;
+    btn.textContent = '⏳ BUSCANDO...';
     allResults = [];
     document.getElementById('results-container').innerHTML = renderSkeletons(12);
-    setStatus('loading', 'Buscando promos...');
+    setStatus('loading', 'Iniciando busca...');
 
     const erros = [];
     for (const cat of CATEGORIAS) {
@@ -649,9 +632,9 @@
     document.getElementById('last-update').textContent = `Última busca: ${agora}`;
 
     if (!allResults.length) {
-      setStatus('error', 'Nenhuma promo encontrada com ≥' + DESCONTO_MIN + '% de desconto.');
+      setStatus('error', 'Nenhuma promo encontrada. Token pode ter expirado — tente novamente.');
     } else {
-      setStatus('done', `${allResults.length} promos encontradas com ≥${DESCONTO_MIN}% off.`);
+      setStatus('done', `${allResults.length} promos encontradas com ≥${DESCONTO_MIN}% off.${erros.length ? ' (' + erros.join(', ') + ' com erro)' : ''}`);
     }
 
     renderResults();
@@ -670,11 +653,11 @@
 ` +
       `🛒 ${item.link}`;
     navigator.clipboard.writeText(texto).then(() => {
-      const btn = document.querySelector(`#card-${id} .btn-copiar`);
+      const btn = document.querySelector(`#card-${item.id} .btn-copiar`);
       if (btn) {
-        btn.textContent = '✅';
+        btn.textContent = '✅ COPIADO';
         btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 2000);
+        setTimeout(() => { btn.textContent = '📋 COPIAR'; btn.classList.remove('copied'); }, 2000);
       }
     });
   }
@@ -689,25 +672,8 @@
     });
   });
 
-  // ── INIT ──────────────────────────────────────────────────────────
-
   window.addEventListener('DOMContentLoaded', () => {
-    // Verifica se voltou do login do ML com token no fragment
-    const tokenFromFragment = getTokenFromFragment();
-    if (tokenFromFragment) {
-      salvarToken(tokenFromFragment);
-      // Limpa o fragment da URL sem recarregar
-      history.replaceState(null, '', window.location.pathname);
-    } else {
-      carregarToken();
-    }
-    atualizarUIAuth();
-
-    if (accessToken) {
-      setStatus('done', 'Conectado! Clique em "Buscar Promos" para começar.');
-    } else {
-      setStatus('', 'Faça login com sua conta do ML para buscar promos.');
-    }
+    setStatus('done', 'Pronto! Clique em "Buscar Promos" para começar.');
   });
 </script>
 
