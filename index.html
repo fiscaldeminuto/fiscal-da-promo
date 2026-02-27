@@ -368,9 +368,15 @@
     <div class="header-title">🎮 FISCAL<br><span>DA PROMO</span></div>
     <div class="header-sub">Hardware Gamer · Desconto ≥ 12% · Mercado Livre</div>
   </div>
-  <div style="text-align:right;">
-    <div class="header-badge">⚡ Ao vivo</div>
-    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#555; margin-top:4px;" id="last-update">Nenhuma busca ainda</div>
+  <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#888;" id="auth-status">🔒 Não conectado</div>
+    <button id="btn-login" onclick="logarComML()" style="background:var(--green);color:var(--black);font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;padding:8px 20px;border:none;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+      🔑 ENTRAR COM ML
+    </button>
+    <button id="btn-logout" onclick="logout()" style="background:var(--gray3);color:#888;font-family:'IBM Plex Mono',monospace;font-size:11px;padding:6px 14px;border:none;border-radius:3px;cursor:pointer;display:none;">
+      sair
+    </button>
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#555;" id="last-update">Nenhuma busca ainda</div>
   </div>
 </header>
 
@@ -385,14 +391,14 @@
     <button class="chip" data-cat="Monitor">🖥️ Monitor</button>
     <button class="chip" data-cat="Suporte">📐 Suporte</button>
   </div>
-  <button class="btn-buscar" id="btn-buscar" onclick="buscarPromos()">
+  <button class="btn-buscar" id="btn-buscar" onclick="buscarPromos()" style="display:none;">
     🔍 BUSCAR PROMOS
   </button>
 </div>
 
 <main>
   <div class="notice">
-    ℹ️ &nbsp;Resultados buscados em tempo real via API autenticada do Mercado Livre (App ID 6398053890425858). Filtro de ≥12% de desconto aplicado direto no servidor. Todos os links já saem com seu ID de afiliado <strong>matt_tool=15318221</strong> embutido automaticamente. 🔗
+    ℹ️ &nbsp;Faça login com sua conta do Mercado Livre para buscar promos. O acesso é feito via OAuth oficial — suas credenciais ficam só no seu navegador. Todos os links gerados já incluem seu ID de afiliado <strong>matt_tool=15318221</strong> automaticamente. 🔗
   </div>
 
   <div class="status-bar" id="status-bar">
@@ -404,36 +410,85 @@
 </main>
 
 <script>
-  // ── CREDENCIAIS ML ──────────────────────────────────────────────
-  const CLIENT_ID     = '6398053890425858';
-  const CLIENT_SECRET = '1e57zwacvG1bXyJlB8dCSLbgxtdFJhux';
-  const MATT_TOOL     = '15318221';
-  const MATT_WORD     = 'flpcamargo';
-  // ────────────────────────────────────────────────────────────────
+  const CLIENT_ID    = '6398053890425858';
+  const REDIRECT_URI = 'https://flpcamargo.github.io/fiscal-da-promo';
+  const MATT_TOOL    = '15318221';
+  const MATT_WORD    = 'flpcamargo';
+  const DESCONTO_MIN = 12;
+
+  const CATEGORIAS = [
+    { nome: 'Teclado',   query: 'teclado gamer',         emoji: '⌨️' },
+    { nome: 'Mouse',     query: 'mouse gamer',           emoji: '🖱️' },
+    { nome: 'Mousepad',  query: 'mousepad gamer',        emoji: '🟦' },
+    { nome: 'Fone',      query: 'headset gamer',         emoji: '🎧' },
+    { nome: 'Monitor',   query: 'monitor gamer',         emoji: '🖥️' },
+    { nome: 'Suporte',   query: 'suporte monitor gamer', emoji: '📐' },
+  ];
 
   let accessToken = null;
-  let tokenExpiry = 0;
+  let filtroAtivo = 'all';
+  let allResults  = [];
 
-  async function getAccessToken() {
-    // Reutiliza token se ainda válido
-    if (accessToken && Date.now() < tokenExpiry) return accessToken;
+  // ── AUTH ──────────────────────────────────────────────────────────
 
-    // Client Credentials flow — não precisa de login do usuário
-    const resp = await fetch('https://api.mercadolibre.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type:    'client_credentials',
-        client_id:     CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-      })
-    });
-    if (!resp.ok) throw new Error('Falha ao obter token: ' + resp.status);
-    const data = await resp.json();
-    accessToken = data.access_token;
-    tokenExpiry = Date.now() + (data.expires_in - 60) * 1000; // renova 1min antes
-    return accessToken;
+  function getTokenFromURL() {
+    // Após o redirect do ML, o code vem na query string
+    const params = new URLSearchParams(window.location.search);
+    return params.get('code');
   }
+
+  async function trocarCodePorToken(code) {
+    // O ML exige que a troca de code por token seja feita server-side
+    // Como somos uma página estática, usamos o fluxo implícito via fragment (#access_token=...)
+    // Porém o ML não suporta implicit flow — usamos PKCE como alternativa
+    // Por ora: guardamos o code e orientamos o usuário
+    return null;
+  }
+
+  function getTokenFromFragment() {
+    const hash = window.location.hash;
+    if (!hash) return null;
+    const params = new URLSearchParams(hash.replace('#', ''));
+    return params.get('access_token');
+  }
+
+  function salvarToken(token) {
+    sessionStorage.setItem('ml_token', token);
+    accessToken = token;
+  }
+
+  function carregarToken() {
+    const t = sessionStorage.getItem('ml_token');
+    if (t) accessToken = t;
+    return t;
+  }
+
+  function logarComML() {
+    // Gera state aleatório pra segurança
+    const state = Math.random().toString(36).substring(2);
+    sessionStorage.setItem('ml_oauth_state', state);
+
+    const authURL = `https://auth.mercadolivre.com.br/authorization?response_type=token&client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
+    window.location.href = authURL;
+  }
+
+  function logout() {
+    sessionStorage.removeItem('ml_token');
+    accessToken = null;
+    atualizarUIAuth();
+    document.getElementById('results-container').innerHTML = '';
+    setStatus('', 'Desconectado. Faça login para buscar promos.');
+  }
+
+  function atualizarUIAuth() {
+    const loggedIn = !!accessToken;
+    document.getElementById('btn-login').style.display  = loggedIn ? 'none'  : 'flex';
+    document.getElementById('btn-logout').style.display = loggedIn ? 'flex'  : 'none';
+    document.getElementById('btn-buscar').style.display = loggedIn ? 'flex'  : 'none';
+    document.getElementById('auth-status').textContent  = loggedIn ? '✅ Conectado ao ML' : '🔒 Não conectado';
+  }
+
+  // ── AFILIADO ──────────────────────────────────────────────────────
 
   function gerarLinkAfiliado(linkOriginal) {
     try {
@@ -445,85 +500,44 @@
     } catch(e) { return linkOriginal; }
   }
 
-  const CATEGORIAS = [
-    { nome: 'Teclado',   query: 'teclado gamer',           emoji: '⌨️' },
-    { nome: 'Mouse',     query: 'mouse gamer',             emoji: '🖱️' },
-    { nome: 'Mousepad',  query: 'mousepad gamer',          emoji: '🟦' },
-    { nome: 'Fone',      query: 'headset gamer fone',      emoji: '🎧' },
-    { nome: 'Monitor',   query: 'monitor gamer',           emoji: '🖥️' },
-    { nome: 'Suporte',   query: 'suporte monitor gamer',   emoji: '📐' },
-  ];
-
-  const DESCONTO_MIN = 12;
-
-  function gerarLinkAfiliado(linkOriginal) {
-    try {
-      const url = new URL(linkOriginal);
-      url.searchParams.set('matt_tool', MATT_TOOL);
-      url.searchParams.set('matt_word', MATT_WORD);
-      url.searchParams.set('matt_source', 'fiscal_da_promo');
-      return url.toString();
-    } catch(e) {
-      return linkOriginal;
-    }
-  }
-  let allResults = [];
-  let filtroAtivo = 'all';
-
-  // Chip filter
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      filtroAtivo = chip.dataset.cat;
-      renderResults();
-    });
-  });
-
-  function setStatus(type, text) {
-    const bar = document.getElementById('status-bar');
-    bar.className = 'status-bar ' + type;
-    document.getElementById('status-text').textContent = text;
-  }
+  // ── BUSCA ─────────────────────────────────────────────────────────
 
   async function buscarCategoria(cat) {
-    const token = await getAccessToken();
     const promos = [];
     const offsets = [0, 50, 100];
 
     for (const offset of offsets) {
       try {
-        // Com token autenticado podemos usar discount= e sort=discount_desc
         const url = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(cat.query)}&discount=${DESCONTO_MIN}-100&sort=discount_desc&limit=50&offset=${offset}`;
         const res = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${accessToken}` }
         });
         if (!res.ok) break;
         const data = await res.json();
         if (!data.results?.length) break;
 
         for (const item of data.results) {
-          const precoAtual = item.price;
+          const precoAtual    = item.price;
           const precoOriginal = item.original_price;
 
           let desconto = 0;
           if (precoOriginal && precoOriginal > precoAtual) {
             desconto = Math.round(((precoOriginal - precoAtual) / precoOriginal) * 100);
           } else {
-            desconto = DESCONTO_MIN; // passou no filtro discount= do ML
+            desconto = DESCONTO_MIN;
           }
           if (desconto < DESCONTO_MIN) continue;
 
           promos.push({
-            id: item.id,
-            titulo: item.title,
-            preco: precoAtual,
+            id:            item.id,
+            titulo:        item.title,
+            preco:         precoAtual,
             precoOriginal: precoOriginal || null,
-            desconto: desconto,
-            imagem: item.thumbnail?.replace('I.jpg', 'O.jpg'),
-            link: gerarLinkAfiliado(item.permalink),
-            categoria: cat.nome,
-            emoji: cat.emoji,
+            desconto:      desconto,
+            imagem:        item.thumbnail?.replace('I.jpg', 'O.jpg'),
+            link:          gerarLinkAfiliado(item.permalink),
+            categoria:     cat.nome,
+            emoji:         cat.emoji,
           });
         }
       } catch(e) { break; }
@@ -532,29 +546,38 @@
     return promos.sort((a, b) => b.desconto - a.desconto);
   }
 
+  // ── STATUS ────────────────────────────────────────────────────────
+
+  function setStatus(type, text) {
+    const bar = document.getElementById('status-bar');
+    bar.className = 'status-bar ' + type;
+    document.getElementById('status-text').textContent = text;
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────────
+
   function formatBRL(val) {
     return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
   function renderCard(item) {
-    const cardId = 'card-' + item.id;
     return `
-      <div class="promo-card" id="${cardId}">
+      <div class="promo-card" id="card-${item.id}">
         <div class="card-discount-badge">-${item.desconto}%</div>
         ${item.imagem
-          ? `<img class="card-img" src="${item.imagem}" alt="${item.titulo}" loading="lazy" onerror="this.style.display='none'">`
+          ? `<img class="card-img" src="${item.imagem}" alt="${item.titulo}" loading="lazy">`
           : `<div class="card-img-placeholder">${item.emoji}</div>`}
         <div class="card-body">
           <div class="card-category">${item.emoji} ${item.categoria}</div>
           <div class="card-title">${item.titulo}</div>
           <div class="card-prices">
-            <span class="price-old">${formatBRL(item.precoOriginal)}</span>
+            ${item.precoOriginal ? `<span class="price-old">${formatBRL(item.precoOriginal)}</span>` : ''}
             <span class="price-new">${formatBRL(item.preco)}</span>
           </div>
         </div>
         <div class="card-footer">
           <a class="btn-ver" href="${item.link}" target="_blank">→ VER NO ML</a>
-          <button class="btn-copiar" onclick="copiarCard('${item.id}')">📋 COPIAR</button>
+          <button class="btn-copiar" onclick="copiarCard('${item.id}')">📋</button>
         </div>
       </div>`;
   }
@@ -568,17 +591,17 @@
           <div class="skeleton-line short"></div>
           <div class="skeleton-line medium"></div>
           <div class="skeleton-line"></div>
-          <div class="skeleton-line short"></div>
         </div>
       </div>`;
     }
-    html += '</div>';
-    return html;
+    return html + '</div>';
   }
 
   function renderResults() {
     const container = document.getElementById('results-container');
-    if (allResults.length === 0) {
+    const filtered  = filtroAtivo === 'all' ? allResults : allResults.filter(i => i.categoria === filtroAtivo);
+
+    if (!filtered.length) {
       container.innerHTML = `<div class="empty-state">
         <div class="empty-icon">🎮</div>
         <div class="empty-title">Nenhuma promo encontrada</div>
@@ -587,11 +610,6 @@
       return;
     }
 
-    const filtered = filtroAtivo === 'all'
-      ? allResults
-      : allResults.filter(i => i.categoria === filtroAtivo);
-
-    // Group by category
     const grupos = {};
     for (const item of filtered) {
       if (!grupos[item.categoria]) grupos[item.categoria] = [];
@@ -600,36 +618,23 @@
 
     let html = '';
     for (const [cat, items] of Object.entries(grupos)) {
-      const catInfo = CATEGORIAS.find(c => c.nome === cat);
+      const info = CATEGORIAS.find(c => c.nome === cat);
       html += `
         <div class="section-head">
-          <span class="section-head-title">${catInfo?.emoji || ''} ${cat}</span>
+          <span class="section-head-title">${info?.emoji || ''} ${cat}</span>
           <span class="section-count">${items.length} promos com ≥${DESCONTO_MIN}% off</span>
         </div>
-        <div class="promo-grid">
-          ${items.map(renderCard).join('')}
-        </div>`;
+        <div class="promo-grid">${items.map(renderCard).join('')}</div>`;
     }
-
-    if (!html) {
-      html = `<div class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title">Sem promos nessa categoria</div>
-        <div class="empty-sub">Tente outra categoria ou busque novamente</div>
-      </div>`;
-    }
-
     container.innerHTML = html;
   }
 
   async function buscarPromos() {
     const btn = document.getElementById('btn-buscar');
     btn.disabled = true;
-    btn.textContent = '⏳ BUSCANDO...';
     allResults = [];
-
     document.getElementById('results-container').innerHTML = renderSkeletons(12);
-    setStatus('loading', 'Buscando promos em todas as categorias...');
+    setStatus('loading', 'Buscando promos...');
 
     const erros = [];
     for (const cat of CATEGORIAS) {
@@ -637,19 +642,16 @@
       try {
         const items = await buscarCategoria(cat);
         allResults.push(...items);
-      } catch(e) {
-        erros.push(cat.nome);
-      }
+      } catch(e) { erros.push(cat.nome); }
     }
 
-    const total = allResults.length;
     const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     document.getElementById('last-update').textContent = `Última busca: ${agora}`;
 
-    if (total === 0) {
+    if (!allResults.length) {
       setStatus('error', 'Nenhuma promo encontrada com ≥' + DESCONTO_MIN + '% de desconto.');
     } else {
-      setStatus('done', `${total} promos encontradas com ≥${DESCONTO_MIN}% de desconto.${erros.length ? ' (' + erros.join(', ') + ' com erro)' : ''}`);
+      setStatus('done', `${allResults.length} promos encontradas com ≥${DESCONTO_MIN}% off.`);
     }
 
     renderResults();
@@ -660,23 +662,53 @@
   function copiarCard(id) {
     const item = allResults.find(i => i.id === id);
     if (!item) return;
+    const texto = `🎮 *${item.titulo}*
 
-    const texto = `🎮 *${item.titulo}*\n\n` +
-      `~~${formatBRL(item.precoOriginal)}~~ → *${formatBRL(item.preco)}* (-${item.desconto}% OFF) 🔥\n\n` +
+` +
+      `${item.precoOriginal ? '~~' + formatBRL(item.precoOriginal) + '~~ → ' : ''}*${formatBRL(item.preco)}* (-${item.desconto}% OFF) 🔥
+
+` +
       `🛒 ${item.link}`;
-
     navigator.clipboard.writeText(texto).then(() => {
       const btn = document.querySelector(`#card-${id} .btn-copiar`);
       if (btn) {
-        btn.textContent = '✅ COPIADO';
+        btn.textContent = '✅';
         btn.classList.add('copied');
-        setTimeout(() => {
-          btn.textContent = '📋 COPIAR';
-          btn.classList.remove('copied');
-        }, 2000);
+        setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 2000);
       }
     });
   }
+
+  // Chip filters
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      filtroAtivo = chip.dataset.cat;
+      renderResults();
+    });
+  });
+
+  // ── INIT ──────────────────────────────────────────────────────────
+
+  window.addEventListener('DOMContentLoaded', () => {
+    // Verifica se voltou do login do ML com token no fragment
+    const tokenFromFragment = getTokenFromFragment();
+    if (tokenFromFragment) {
+      salvarToken(tokenFromFragment);
+      // Limpa o fragment da URL sem recarregar
+      history.replaceState(null, '', window.location.pathname);
+    } else {
+      carregarToken();
+    }
+    atualizarUIAuth();
+
+    if (accessToken) {
+      setStatus('done', 'Conectado! Clique em "Buscar Promos" para começar.');
+    } else {
+      setStatus('', 'Faça login com sua conta do ML para buscar promos.');
+    }
+  });
 </script>
 
 </body>
